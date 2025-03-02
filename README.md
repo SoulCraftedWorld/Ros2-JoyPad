@@ -1,11 +1,16 @@
 # ROS2 JoyPad
 
+![img.png](resource/img.png)
+
+---
+
 English | [Русский](#Описание-русский)
 
 ---
 
 ## English Description
 **ROS2 JoyPad** is a user-friendly application for controlling a robot through ROS2. It allows real-time control of linear and angular velocity (Z-axis) using both keyboard input and application buttons.
+
 
 ### 🚀 Features:
 - Control robot movement and rotation.
