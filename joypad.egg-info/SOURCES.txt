@@ -1,0 +1,16 @@
+package.xml
+setup.cfg
+setup.py
+joypad/__init__.py
+joypad/joypad.py
+joypad.egg-info/PKG-INFO
+joypad.egg-info/SOURCES.txt
+joypad.egg-info/dependency_links.txt
+joypad.egg-info/entry_points.txt
+joypad.egg-info/requires.txt
+joypad.egg-info/top_level.txt
+joypad.egg-info/zip-safe
+resource/joypad
+test/test_copyright.py
+test/test_flake8.py
+test/test_pep257.py
