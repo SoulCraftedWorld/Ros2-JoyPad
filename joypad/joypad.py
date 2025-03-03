@@ -114,6 +114,15 @@ key_mapping = {
     frozenset([Qt.Key_Backspace]): (0, 0, '🛑'),
     frozenset([rus_key_x]): (0, 0, '🛑'),
     frozenset([rus_key_k]): (0, 0, '🛑'),
+    frozenset([Qt.Key_X, Qt.Key_D]): (0, 0, '🛑'),
+    frozenset([Qt.Key_X, Qt.Key_A]): (0, 0, '🛑'),
+    frozenset([Qt.Key_X, Qt.Key_W]): (0, 0, '🛑'),
+    frozenset([Qt.Key_X, Qt.Key_S]): (0, 0, '🛑'),
+
+    frozenset([rus_key_x, rus_key_a]): (0, 0, '🛑'),
+    frozenset([rus_key_x, rus_key_w]): (0, 0, '🛑'),
+    frozenset([rus_key_x, rus_key_s]): (0, 0, '🛑'),
+    frozenset([rus_key_x, rus_key_d]): (0, 0, '🛑')
 
 }
 
@@ -372,6 +381,7 @@ class JoyPadGui(Node, QWidget):
 
     def initUI(self):
 
+        # delete all timers if they exist
         if len(self.inc_dec_buttons_timers) > 0:
             for timer in self.inc_dec_buttons_timers.values():
                 timer.stop()
@@ -658,7 +668,6 @@ class JoyPadGui(Node, QWidget):
 
     def handle_keep_publishing(self):
         self.start_publishing(self.keep_publishing)
-        #self.btn_keep_publishing.setText(lang_dict[self.cur_lang]['keep_publishing'] + ' ' + ('🔵' if self.keep_publishing else '🔴'))
 
     def keyPressEvent(self, event):
         """Handle key press"""

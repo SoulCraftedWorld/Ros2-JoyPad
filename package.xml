@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>joypad</name>
-  <version>0.2.0</version>
+  <version>0.2.1</version>
   <description>ROS2 JoyPad - robot control via keyboard and buttons/ управление роботом через клавиатуру и кнопки</description>
   <maintainer email="madewithmysoul@gmail.com">JC</maintainer>
   <license>Apache-2.0</license>
