@@ -36,17 +36,21 @@ RELEASE_DELAY = 70  # ms
 SPEED_HOLD_INTERVAL = 200  # ms
 SPEED_INITIAL_DELAY = 300
 
+DEFAULT_TOPIC_NAME = '/cmd_vel'
+
 rus_key_w = int(1062) #ord('ц')
 rus_key_a = int(1060)  #ord('ф')
 rus_key_s = int(1067)   # ord('ы')
 rus_key_d = int(1042)  #ord('в')
 rus_key_k = int(1051)  #ord('л')
+rus_key_x = int(1063)  #ord('х')
 
 rus_key_w2 = ord('ц')
 rus_key_a2 = ord('ф')
 rus_key_s2 = ord('ы')
 rus_key_d2 = ord('в')
 rus_key_k2 = ord('л')
+
 #print(f"RUS keys: {rus_key_w}, {rus_key_a}, {rus_key_s}, {rus_key_d}, {rus_key_k}")
 # 1081, 1092, 1099, 1074, 1083
 
@@ -104,9 +108,11 @@ key_mapping = {
     frozenset([rus_key_s, rus_key_a]): (-1, 1, '↙️'),
     frozenset([rus_key_s2, rus_key_a2]): (-1, 1, '↙️'),
 
-    frozenset([Qt.Key_Space]): (0, 0, '🛑'),
+    frozenset([Qt.Key_X]): (0, 0, '🛑'),
     frozenset([Qt.Key_K]): (0, 0, '🛑'),
     frozenset([Qt.Key_Return]): (0, 0, '🛑'),
+    frozenset([Qt.Key_Backspace]): (0, 0, '🛑'),
+    frozenset([rus_key_x]): (0, 0, '🛑'),
     frozenset([rus_key_k]): (0, 0, '🛑'),
 
 }
@@ -124,7 +130,7 @@ lang_dict = {
         'current_speed': '🚗 Текущая-',
         'direction': 'Направление',
         'stop': '❌ Стоп',
-        'connect': 'Прослушивание {topic} {state} ',
+        'connect': '📢 Топик {state} ',
         'current_speed_val': '{current_lin_x:.2f} км/ч',
         'current_ang_speed_val': '{current_ang_z:.2f} °/с',
         'lin_speed_up': 'Лин. ➕',
@@ -133,7 +139,8 @@ lang_dict = {
         'ang_speed_down': 'Угл. ➖',
         'about': 'О приложении',
         'to_default': ' Сбросить ',
-        'keep_publishing': 'Удерживать публик.',
+        'keep_publishing': '🔄 Авто-вещание',
+        'flex_lin_speed': '🎚️ Мягкое ускор.',
         'about_text': "🔹 ROS2 JoyPad 🔹\n"
                 "Удобное управление роботом через ROS2.\n\n"
                 "📡 Возможности:\n\n"
@@ -142,7 +149,9 @@ lang_dict = {
                 "⏳ Активно только при удержании клавиши\n"
                 "📊 Мониторинг скорости\n"
                 "🌍 Многоязычный интерфейс\n"
-                "🔗 Контроль соединения и показаний `/cmd_vel`\n\n"
+                "📢 Контроль соединения и показаний топика\n"
+                "🔄 Авто-вещание - постоянное вещанеи на топик\n"      
+                "🎚️ Мягкое ускор.– плавное изменение скорости при управлении.\n\n"
                 "© 2025 ROS2 JoyPad JCreator\n"
     },
     'en': {
@@ -157,7 +166,7 @@ lang_dict = {
         'current_speed': '🚗 Current-',
         'direction': 'Direction',
         'stop': '❌ Stop',
-        'connect': 'Listen {topic} {state} ',
+        'connect': '📢 Topic {state} ',
         'current_speed_val': '{current_lin_x:.2f} km/h',
         'current_ang_speed_val': '{current_ang_z:.2f} °/s',
         'lin_speed_up': 'Lin. ➕',
@@ -166,7 +175,8 @@ lang_dict = {
         'ang_speed_down': 'Ang. ➖',
         'about': 'About',
         'to_default': ' Reset ',
-        'keep_publishing': 'Keep publishing',
+        'keep_publishing': '🔄 Auto Stream',
+        'flex_lin_speed': '🎚️ Flex Accel',
         'about_text': "🔹 ROS2 JoyPad 🔹\n"
                 "Convenient robot control via ROS2.\n\n"
                 "📡 Features:\n\n"
@@ -175,10 +185,11 @@ lang_dict = {
                 "⏳ Active only when holding a key\n"
                 "📊 Speed monitoring\n"
                 "🌍 Multilingual interface\n"
-                "🔗 Connection control and values of `/cmd_vel`\n\n"
+                "📢 Connection control and values of topic\n"
+                "🔄 Auto Stream - repeate streaming on topic\n"
+                "🎚️ Flex Accel – smooth acceleration control\n\n"
                 "© 2025 ROS2 JoyPad JCreator\n"
     }
-
 }
 
 button_style = """
@@ -235,8 +246,8 @@ class JoyPadGui(Node, QWidget):
         self.raise_()
 
         # ROS2 Publisher & Subscriber
-        self.pub_cmd_vel_topic = '/cmd_vel'
-        self.sub_cmd_vel_topic = '/cmd_vel'
+        self.pub_cmd_vel_topic = DEFAULT_TOPIC_NAME
+        self.sub_cmd_vel_topic = DEFAULT_TOPIC_NAME
         self.pub_cmd_vel = None
         self.sub_cmd_vel = None
 
@@ -278,10 +289,14 @@ class JoyPadGui(Node, QWidget):
 
         self.key_buttons_match = {}
 
+        self.flex_lin_speed = False
+        self.lin_speed_accum = 0.0 
+        self.last_public_time_sec = 0
+
         # Интерфейс
         self.initUI()
         self.setFocusPolicy(Qt.StrongFocus)  # Позволяет окну принимать события клавиатуры
-
+    
     def subscribe_to_topic(self, topic_name):
         """Subscribe to topic"""
         if self.cmd_vel_timeout_timer.isActive():
@@ -347,6 +362,13 @@ class JoyPadGui(Node, QWidget):
                 self.create_publisher_for_cmd(self.pub_cmd_vel_topic)
                 self.subscribe_to_topic(self.sub_cmd_vel_topic)
                 self.initUI()
+                return
+        if self.sub_cmd_vel_topic =='':
+            self.sub_cmd_vel_topic = DEFAULT_TOPIC_NAME
+            self.pub_cmd_vel_topic = DEFAULT_TOPIC_NAME
+            self.create_publisher_for_cmd(self.pub_cmd_vel_topic)
+            self.subscribe_to_topic(self.sub_cmd_vel_topic)
+            self.initUI()
 
     def initUI(self):
 
@@ -461,9 +483,8 @@ class JoyPadGui(Node, QWidget):
 
 
 
-        # Блок управления скоростью
+        # Speed control menu
         speed_grid = QGridLayout()
-
 
         self.btn_lin_speed_up = QPushButton(lang_dict[self.cur_lang]['lin_speed_up'])
         self.btn_lin_speed_up.setFont(self.emoji_font)
@@ -520,7 +541,7 @@ class JoyPadGui(Node, QWidget):
         grid = QGridLayout()
         grid.setContentsMargins(10, 10, 10, 10)  # Padding
 
-        # Кнопки движения
+        # Direction buttons
         self.btn_up = QPushButton("W⬆️")
         self.btn_up.setFont(self.emoji_font_big)
         self.btn_up.setFixedSize(button_w, button_h)
@@ -533,7 +554,7 @@ class JoyPadGui(Node, QWidget):
         self.btn_right = QPushButton("➡️D")
         self.btn_right.setFont(self.emoji_font_big)
         self.btn_right.setFixedSize(button_w, button_h)
-        self.btn_stop = QPushButton("🔲")
+        self.btn_stop = QPushButton("X🔲")
         self.btn_stop.setFont(self.emoji_font_big)
         self.btn_stop.setFixedSize(button_w, button_h)
 
@@ -548,27 +569,33 @@ class JoyPadGui(Node, QWidget):
         self.btn_left.setStyleSheet(button_style)
         self.btn_right.setStyleSheet(button_style)
 
+        # key buttons handling
         self.key_buttons_match[Qt.Key_W] = self.btn_up
         self.key_buttons_match[Qt.Key_S] = self.btn_down
         self.key_buttons_match[Qt.Key_A] = self.btn_left
         self.key_buttons_match[Qt.Key_D] = self.btn_right
+        self.key_buttons_match[Qt.Key_X] = self.btn_stop
+        self.key_buttons_match[Qt.Key_K] = self.btn_stop
+        self.key_buttons_match[Qt.Key_Return] = self.btn_stop
 
-        # rus keys
+        # rus keys handling
         self.key_buttons_match[rus_key_w] = self.btn_up
         self.key_buttons_match[rus_key_s] = self.btn_down
         self.key_buttons_match[rus_key_a] = self.btn_left
         self.key_buttons_match[rus_key_d] = self.btn_right
+        self.key_buttons_match[rus_key_x] = self.btn_stop
 
         self.btn_up.pressed.connect(lambda: self.handle_key_press(Qt.Key_W))
         self.btn_down.pressed.connect(lambda: self.handle_key_press(Qt.Key_S))
         self.btn_left.pressed.connect(lambda: self.handle_key_press(Qt.Key_A))
         self.btn_right.pressed.connect(lambda: self.handle_key_press(Qt.Key_D))
-        self.btn_stop.clicked.connect(lambda: self.stop_motion())
+        self.btn_stop.pressed.connect(lambda: self.stop_motion(Qt.Key_X))
 
         self.btn_up.released.connect(lambda: self.handle_key_release(Qt.Key_W))
         self.btn_down.released.connect(lambda: self.handle_key_release(Qt.Key_S))
         self.btn_left.released.connect(lambda: self.handle_key_release(Qt.Key_A))
         self.btn_right.released.connect(lambda: self.handle_key_release(Qt.Key_D))
+        self.btn_stop.released.connect(lambda: self.handle_key_release(Qt.Key_X))
 
         self.layout.addLayout(grid)
 
@@ -576,7 +603,7 @@ class JoyPadGui(Node, QWidget):
 
         bottom_grid = QGridLayout()
         self.label_connect_cmd_vel_topic = QLabel(
-                lang_dict[self.cur_lang]['connect'].format(topic=self.sub_cmd_vel_topic, state='🔗'))
+                lang_dict[self.cur_lang]['connect'].format(state='🔗'))
         self.label_connect_cmd_vel_topic.setFont(self.emoji_font_small)
         bottom_grid.addWidget(self.label_connect_cmd_vel_topic, 0, 0)
 
@@ -589,6 +616,15 @@ class JoyPadGui(Node, QWidget):
 
         self.btn_keep_publishing.clicked.connect(lambda: self.handle_keep_publishing_pressed())
         bottom_grid.addWidget(self.btn_keep_publishing, 0, 1)
+
+        self.btn_flex_lin_speed = QPushButton(lang_dict[self.cur_lang]['flex_lin_speed'])
+        self.btn_flex_lin_speed.setFont(self.emoji_font_small)
+        self.btn_flex_lin_speed.setCheckable(True)
+        self.change_button_color(self.btn_flex_lin_speed, "grey")
+        self.btn_flex_lin_speed.toggled.connect(
+            lambda checked: self.change_button_color(self.btn_flex_lin_speed, "blue" if checked else "grey"))
+        self.btn_flex_lin_speed.clicked.connect(lambda: self.handle_btn_flex_lin_speed_pressed())
+        bottom_grid.addWidget(self.btn_flex_lin_speed, 0, 2)
 
         self.layout.addLayout(bottom_grid)
 
@@ -606,6 +642,15 @@ class JoyPadGui(Node, QWidget):
         palette.setColor(QPalette.Button, QColor(color))  # Set color
         q_object.setPalette(palette)
         q_object.update()
+
+    def handle_btn_flex_lin_speed_pressed(self):
+        self.flex_lin_speed = not self.flex_lin_speed
+        self.lin_speed_accum = 0.0
+
+        # switch keep_publishing on if flex_lin_speed is on
+        if self.flex_lin_speed and self.keep_publishing != True:
+            self.btn_keep_publishing.click()
+
 
     def handle_keep_publishing_pressed(self):
         self.keep_publishing = not self.keep_publishing
@@ -669,18 +714,73 @@ class JoyPadGui(Node, QWidget):
 
         self.update_twist()
 
+    def handle_lin_speed_on_release(self, release_step):
+        if self.lin_speed_accum != 0.0:
+            if self.lin_speed_accum > 0.0:
+                self.lin_speed_accum -= release_step
+                if self.lin_speed_accum < 0.0:
+                    self.lin_speed_accum = 0.0
+            else:
+                self.lin_speed_accum += release_step
+                if self.lin_speed_accum > 0.0:
+                    self.lin_speed_accum = 0.0
+
     def update_twist(self):
         """Update twist message"""
         lin_x, ang_z = 0.0, 0.0
         directions = []
 
+        curr_time_sec = self.get_clock().now().nanoseconds / 1e9
+        d_time_sec = curr_time_sec - self.last_public_time_sec
+        self.last_public_time_sec = curr_time_sec
+        if d_time_sec > 0.25:
+            d_time_sec = 0.25
+
         if self.movement_active:
             pressed_set = frozenset(self.pressed_keys)
             if pressed_set in key_mapping:
                 lx, az, direction = key_mapping[pressed_set]
-                lin_x += lx * self.lin_speed
-                ang_z += az * self.ang_speed
+
+                # mode for flexible linear speed - increase if lin key pressed or decrease to 0 if lin key released
+                if self.flex_lin_speed:
+                    lin_speed_step = self.lin_speed * d_time_sec
+                    if lx == 0.0: # if lin key released
+                        if az == 0.0:
+                            self.lin_speed_accum = 0.0
+                        else:
+                            self.handle_lin_speed_on_release(lin_speed_step/ 3.0)
+
+                    else:
+                        lin_x_max = self.lin_speed * lx
+                        if lx > 0.0: # Forward
+                            # check for reverse
+                            if self.lin_speed_accum < 0.0:
+                                self.lin_speed_accum += lin_speed_step * 2.0
+                            else:
+                                self.lin_speed_accum += lin_speed_step
+                                if self.lin_speed_accum > lin_x_max:
+                                    self.lin_speed_accum = lin_x_max
+                        else: # Backward
+                            # check for forward
+                            if self.lin_speed_accum > 0.0:
+                                self.lin_speed_accum -= lin_speed_step * 2.0
+                            else:
+                                self.lin_speed_accum -= lin_speed_step
+                                if self.lin_speed_accum < lin_x_max:
+                                    self.lin_speed_accum = lin_x_max
+
+                    # set lin_x to accumulated value
+                    lin_x = self.lin_speed_accum
+
+                else:
+                    lin_x = lx * self.lin_speed
+
+                ang_z = az * self.ang_speed
                 directions.append(direction)
+        else:
+            if self.flex_lin_speed:
+                self.handle_lin_speed_on_release(self.lin_speed * d_time_sec/ 3.0)
+                lin_x = self.lin_speed_accum
 
         self.joypad_lin_speed = lin_x
         self.joypad_ang_speed = ang_z
@@ -693,7 +793,7 @@ class JoyPadGui(Node, QWidget):
         twist.angular.y = 0.0
         twist.angular.z = ang_z
         self.pub_cmd_vel.publish(twist)
-
+  
         # Update GUI in main thread only!
         QTimer.singleShot(0, lambda: self.update_key_gui(directions))
  
@@ -730,11 +830,15 @@ class JoyPadGui(Node, QWidget):
             lang_dict[self.cur_lang]['ang_speed_val'].format(ang_speed=to_gard_sec(self.joypad_ang_speed)))
 
 
-    def stop_motion(self):
+    def stop_motion(self, key):
         """Stop motion"""
         self.pressed_keys.clear()
         self.movement_active = False
+        self.lin_speed_accum = 0.0
         self.update_twist()
+
+        if key in self.key_buttons_match:
+            self.key_buttons_match[key].setDown(True)
 
     def set_speed_default(self):
         """Set default speed"""
@@ -804,11 +908,14 @@ class JoyPadGui(Node, QWidget):
     def update_connection(self):
         """Update connection status with /cmd_vel topic"""
         if self.is_cmd_vel_connected:
-            self.label_connect_cmd_vel_topic.setText(lang_dict[self.cur_lang]['connect'].format(topic=self.sub_cmd_vel_topic, state='🔗'))
+            self.label_connect_cmd_vel_topic.setText(lang_dict[self.cur_lang]['connect'].format(state='🔗'))
             self.label_connect_cmd_vel_topic.setStyleSheet("color: green;")
         else:
-            self.label_connect_cmd_vel_topic.setText(lang_dict[self.cur_lang]['connect'].format(topic=self.sub_cmd_vel_topic, state='🚫'))
+            self.label_connect_cmd_vel_topic.setText(lang_dict[self.cur_lang]['connect'].format(state='🚫'))
             self.label_connect_cmd_vel_topic.setStyleSheet("color: red;")
+            self.update_gui() # update last value
+
+
 
     def set_lost_connection(self):
         """Set lost connection"""
@@ -846,7 +953,11 @@ class JoyPadGui(Node, QWidget):
 
         if lin_x != self.current_lin_x and now > self.curr_lin_x_next_change_time:
             self.label_current_speeds.setText(lang_dict[self.cur_lang]['current_speed_val'].format(current_lin_x=to_km_h(lin_x)))
-            self.label_current_speeds.setStyleSheet("color: red;")
+            if (lin_x > 0):
+                self.label_current_speeds.setStyleSheet("color: green;")
+            else:
+                self.label_current_speeds.setStyleSheet("color: red;")
+
             QTimer.singleShot(1700, self.update_lin_speed_color)
             self.current_lin_x = lin_x
             self.curr_lin_x_next_change_time = now + CMD_VEL_UPDATE_INTERVAL
@@ -854,7 +965,11 @@ class JoyPadGui(Node, QWidget):
 
         if  ang_z != self.current_ang_z and now > self.curr_ang_z_next_change_time:
             self.label_current_ang_speeds.setText(lang_dict[self.cur_lang]['current_ang_speed_val'].format(current_ang_z=to_gard_sec(ang_z)))
-            self.label_current_ang_speeds.setStyleSheet("color: red;")
+            if (ang_z > 0):
+                self.label_current_ang_speeds.setStyleSheet("color: green;")
+            else:
+                self.label_current_ang_speeds.setStyleSheet("color: red;")
+
             QTimer.singleShot(1700, self.update_ang_speed_color)
             self.current_ang_z = ang_z
             self.curr_ang_z_next_change_time = now + CMD_VEL_UPDATE_INTERVAL
